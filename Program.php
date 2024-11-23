@@ -53,39 +53,61 @@ final class DataBase
 
 class DataBaseHelper
 {
-    public function connectAndFetch($id)
+    public function __construct(private readonly DataBase $db)
     {
-        $dataBase = new DataBase();
-        $dataBase->connect();
-        $result = $dataBase->fetch($id);
-        return $result;
+        $this->initConnection();
     }
 
-    public function connectAndInsert($id)
+    public function fetch(int $id): string
     {
-        $dataBase = new DataBase();
-        $dataBase->connect();
-        $result = $dataBase->insert($id);
-        return $result;
+        return $this->retry(fn () => $this->db->fetch($id));
+    }
+
+    public function insert(int $data): string
+    {
+        return $this->retry(fn () => $this->db->insert($data));
+    }
+
+    private function initConnection(): void
+    {
+        try {
+            $this->db->connect();
+        } catch (Throwable) {
+        }
+    }
+
+    /**
+     * @param callable $callback
+     * @return mixed
+     */
+    private function retry(callable $callback)
+    {
+        do {
+            try {
+                return $callback();
+            } catch (Throwable $e) {
+                if ($e instanceof Exception && 'No connection' === $e->getMessage()) {
+                    $this->initConnection();
+                }
+            }
+        } while (true);
     }
 }
 
-function step1($dataToFetch)
+function step1(array $ids): void
 {
-    $dataBaseHelper = new DataBaseHelper();
-
-    for ($i = 1; $i < count($dataToFetch); $i++) {
-        print($dataBaseHelper->connectAndFetch($dataToFetch[$i]));
+    $helper = new DataBaseHelper(new DataBase());
+    foreach ($ids as $id) {
+        print($helper->fetch($id));
         print(PHP_EOL);
     }
 }
 
-function step2($dataToInsert)
+function step2(array $datas): void
 {
-    $dataBaseHelper = new DataBaseHelper();
-
-    for ($i = 0; $i <= count($dataToInsert); $i++) {
-        print($dataBaseHelper->connectAndInsert($dataToInsert[$i]));
+    $helper = new DataBaseHelper(new DataBase());
+    foreach ($datas as $data) {
+        print($helper->insert($data));
         print(PHP_EOL);
     }
 }
